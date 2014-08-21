@@ -1,0 +1,6 @@
+INDEX VERSION 1.126+C:\Users\carlo\Dropbox\intelligenza artificiale\current project\workspace\.metadata\.plugins\org.eclipse.jdt.core
+3653075399.index
+3469574792.index
+2948061856.index
+3352491446.index
+833397812.index

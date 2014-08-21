@@ -1,0 +1,351 @@
+package com.driver;
+
+import java.io.BufferedReader;
+import java.io.DataOutputStream;
+import java.io.IOException;
+import java.net.Socket;
+import java.net.SocketException;
+import java.net.SocketTimeoutException;
+import java.util.List;
+
+import com.driver.R;
+
+import android.app.Activity;
+import android.hardware.Camera;
+import android.hardware.Camera.PreviewCallback;
+import android.hardware.Camera.Size;
+import android.os.Bundle;
+import android.os.Handler;
+import android.os.Message;
+import android.util.Log;
+import android.view.SurfaceHolder;
+import android.view.SurfaceView;
+import android.view.View;
+import android.view.WindowManager;
+import android.view.View.OnClickListener;
+import android.widget.Button;
+import android.widget.TextView;
+import android.widget.Toast;
+
+public class TrainingActivity extends Activity implements OnClickListener,
+		SurfaceHolder.Callback, PreviewCallback {
+
+	// variabili debug
+	private static final String TAG = "TrainingActivity";
+	private static final boolean D = true;
+
+	// variabili camera e preview
+	private boolean mPreviewRunning = false;
+	private Camera mCamera;
+	private SurfaceView mSurfaceView;
+	private SurfaceHolder mSurfaceHolder;
+	private Camera.Parameters p;
+
+	// variabili elementi
+	private Button ScattaButton;
+	private TextView label;
+
+	// variabili connessione wifi
+	private boolean isConnected = false;
+	private Socket wifiSocket = null;
+	private DataOutputStream output = null;
+	private BufferedReader input = null;
+
+	// variabili connessione bluetooth
+	private BtThread btThread;
+	private boolean isReady = true;
+
+	// altre variabili
+	private String azione;
+
+	private Size minSize;
+	private int i = 0;
+	//private long currentTime = 0;
+
+	boolean isSincrono = false;
+
+	// override delle funzioni dell'interfaccia surfaceholder.callback
+	public void surfaceCreated(SurfaceHolder holder) {
+		if (D)
+			Log.e(TAG, "surface created");
+	}
+
+	public void surfaceChanged(SurfaceHolder holder, int format, int w, int h) {
+
+		if (mCamera != null) {
+			if (D)
+				Log.e(TAG, "surface changed");
+			p = mCamera.getParameters();
+			
+			p.setFlashMode(Camera.Parameters.FLASH_MODE_TORCH);
+			p.setFocusMode(Camera.Parameters.FOCUS_MODE_AUTO);
+			
+			
+			List<Size> tmpList = mCamera.getParameters()
+					.getSupportedPreviewSizes();
+			String stringa = "sizes: ";
+			minSize = tmpList.get(0);
+			for (int i = 0; i < tmpList.size(); i++) {
+				if (minSize.width > tmpList.get(i).width) {
+					minSize.height = tmpList.get(i).height;
+					minSize.width = tmpList.get(i).width;
+				}
+			}
+			List<Integer> a = p.getSupportedPreviewFormats();
+			String str2 = null;
+			for (int i = 0; i < a.size(); i++) {
+				str2 = str2 + " codifica " + i + " " + String.valueOf(a);
+			}
+			stringa = "preview size: " + minSize.width + " per "
+					+ minSize.height + str2;
+
+			p.setPreviewSize(minSize.width, minSize.height);
+			label.setText(stringa);
+			p.set("orientation", "portrait");
+			mCamera.setParameters(p);
+			try {
+				mCamera.setPreviewDisplay(holder);
+			} catch (IOException e) {
+				e.printStackTrace();
+				if (D)
+					Log.e(TAG, e.getMessage());
+			}
+		}
+	}
+
+	public void surfaceDestroyed(SurfaceHolder holder) {
+		if (D)
+			Log.e(TAG, "surface destroyed");
+	}
+
+	// onCreate, primo entry point dell'activity
+	public void onCreate(Bundle savedInstanceState) {
+		super.onCreate(savedInstanceState);
+		setContentView(R.layout.tr_activity);
+
+		if (D)
+			Log.e(TAG, "+++ ON CREATE +++");
+
+		// evita spegnimento schermo
+		getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+
+		Handler handler = new MyHandler(this);
+
+		if (MainActivity.getBTSocket() != null) {
+			btThread = new BtThread(MainActivity.getBTSocket(), handler);
+			btThread.start();
+		} else {
+			if (D)
+				Log.e(TAG, "connessione BT mancante");
+			Toast.makeText(getApplicationContext(), "connessione BT mancante",
+					Toast.LENGTH_SHORT).show();
+		}
+
+		wifiSocket = MainActivity.getSocket();
+
+		if (wifiSocket != null // && BTsocket!=null
+		) {
+			isConnected = wifiSocket.isConnected();
+			try {
+				wifiSocket.setSoTimeout(10000);
+			} catch (SocketException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
+			output = WifiLib.InitializeOutput(wifiSocket);
+			input = WifiLib.InitializeInput(wifiSocket);
+
+			if (funzioni.checkCameraHardware(this)) {
+				mCamera = funzioni.getCameraInstance();
+				// mCamera.setPreviewCallback(this);
+				mCamera.setOneShotPreviewCallback(this);
+				if (D)
+					Log.e(TAG, "callback settato");
+
+				mSurfaceView = (SurfaceView) findViewById(R.id.surfaceView1);
+				mSurfaceHolder = mSurfaceView.getHolder();
+
+				mSurfaceHolder.addCallback(this);
+				mSurfaceHolder.setType(SurfaceHolder.SURFACE_TYPE_PUSH_BUFFERS);
+				if (D)
+					Log.e(TAG, "surfaceholder settato");
+
+				ScattaButton = (Button) findViewById(R.id.captureButton);
+				ScattaButton.setOnClickListener(this);
+
+				label = (TextView) findViewById(R.id.label);
+			} else {
+				label.setText("errore camera non trovata");
+				if (D)
+					Log.e(TAG, "errore camera non trovata");
+			}
+		} else {
+			if (D)
+				Log.e(TAG, "connessione al pc mancante");
+			Toast.makeText(getApplicationContext(),
+					"connessione al pc mancante", Toast.LENGTH_SHORT).show();
+		}
+	}
+
+	public void onClick(View v) {
+		if (v.getId() == R.id.captureButton) {
+			if (D)
+				Log.e(TAG, "Button capture click");
+			if (isConnected
+			// &&isConnectedBT
+			) {
+				if (mPreviewRunning) {
+					mCamera.stopPreview();
+				} else {
+					mCamera.startPreview();
+				}
+				mPreviewRunning = !mPreviewRunning;
+			} else {
+				Toast.makeText(getApplicationContext(), "Not Connected",
+						Toast.LENGTH_SHORT).show();
+			}
+		}
+	}
+
+	protected void onPause() {
+		super.onPause();
+		if (D)
+			Log.e(TAG, "+++ ON PAUSE +++");
+	}
+
+	protected void onResume() {
+		super.onResume();
+		if (D)
+			Log.e(TAG, "+++ ON RESUME +++");
+	}
+
+	protected void onStart() {
+		super.onStart();
+		if (D)
+			Log.e(TAG, "+++ ON START +++");
+	}
+
+	protected void onStop() {
+		super.onStop();
+		if (D)
+			Log.e(TAG, "+++ ON STOP +++");
+		if (mPreviewRunning) {
+			mCamera.stopPreview();
+			mPreviewRunning = !mPreviewRunning;
+		}
+	}
+
+	protected void onDestroy() {
+		super.onDestroy();
+		if (D)
+			Log.e(TAG, "+++ ON DESTROY +++");
+		funzioni.releaseCamera(mCamera);
+
+		if (btThread != null) {
+			btThread.stopThread();
+		}
+		MainActivity.closeBTSocket();
+	}
+
+	// override del metodo onpreviewframe dell'interfaccia previewcallback
+	public void onPreviewFrame(byte[] data, Camera camera) {
+
+		if (mCamera != null && isConnected // && btThread != null //&& isReady
+		) {
+			if (D)
+				Log.e(TAG, "PREVIEW " + i);
+
+			synchronized (this) {
+
+				try {
+					// scrivi
+					output.write(data);
+					output.flush();
+
+					azione = input.readLine();
+
+					if (isReady) {
+						if (btThread != null && btThread.isConnectedBT()) {
+							isReady = false;
+							btThread.write(azione);
+						}
+					}
+					if (D)
+						Log.e(TAG, azione);
+
+					label.setText(String.valueOf(azione));
+
+					if (azione.equals("stop")) {
+						isConnected = false;
+						if (mPreviewRunning) {
+							mCamera.stopPreview();
+							mPreviewRunning = !mPreviewRunning;
+						}
+					}
+
+				} catch (SocketTimeoutException e) {
+					if (D)
+						Log.e(TAG, e.getMessage());
+					isConnected = false;
+					if (mPreviewRunning) {
+						mCamera.stopPreview();
+						mPreviewRunning = !mPreviewRunning;
+					}
+				} catch (IOException ex) {
+					if (D)
+						Log.e(TAG, ex.getMessage());
+				} catch (Exception e) {
+					if (D)
+						Log.e(TAG, e.getMessage());
+					Toast.makeText(getApplicationContext(), e.getMessage(),
+							Toast.LENGTH_SHORT).show();
+				}
+				// commenta se tutto sincrono
+				if (!isSincrono) {
+					/*long differ = System.currentTimeMillis() - currentTime;
+					if (differ < 200) {
+						// forza a farne meno di 5 al secondo
+						try {
+							Thread.sleep(differ);
+						} catch (InterruptedException e) {
+							// TODO Auto-generated catch block
+							e.printStackTrace();
+						}
+					}*/
+					mCamera.setOneShotPreviewCallback(this);
+				}
+				//currentTime = System.currentTimeMillis();
+
+			}// synchronized
+
+		}
+
+	}// onpreviewframe
+
+	private class MyHandler extends Handler {
+		Integer numMess = 0;
+		TrainingActivity auto;
+
+		MyHandler(TrainingActivity auto) {
+			super();
+			this.auto = auto;
+		}
+
+		@Override
+		public void handleMessage(Message msg) {
+			Bundle b = msg.getData();
+			if (b.containsKey("okMessage")) {
+				if (mCamera != null && b.getString("okMessage").equals("p")) {
+					isReady = true;
+					numMess++;
+					// decommenta se tutto sincrono
+					if (isSincrono) {
+						mCamera.setOneShotPreviewCallback(auto);
+					}
+					label.setText(label.getText() + " " + numMess.toString());
+				}
+			}
+		}
+	}
+
+}

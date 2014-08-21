@@ -1,0 +1,86 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="com.driver"
+    android:versionCode="1"
+    android:versionName="1.0" >
+
+    <uses-sdk
+        android:minSdkVersion="7"
+        android:targetSdkVersion="15" />
+
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-permission android:name="android.permission.INTERNET" />
+
+    <uses-feature android:name="android.hardware.camera" />
+    <uses-feature android:name="android.hardware.wifi" />
+
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+
+    <uses-feature android:name="android.hardware.bluetooth" />
+
+    <uses-permission android:name="android.permission.BLUETOOTH" />
+    <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" />
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
+
+    <application
+        android:icon="@drawable/ic_launcher"
+        android:label="@string/app_name"
+        android:theme="@style/AppTheme" >
+        <activity
+            android:name="com.driver.MainActivity"
+            android:label="driver"
+            android:screenOrientation="portrait" >
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+        <activity
+            android:name="com.driver.TrainingActivity"
+            android:screenOrientation="portrait" >
+        </activity>
+        <activity
+            android:name="com.driver.AutoActivity"
+            android:screenOrientation="portrait" >
+        </activity>
+        <activity
+            android:name="com.driver.ActivityProva"
+            android:screenOrientation="portrait" >
+        </activity>
+        <activity
+            android:name="com.driver.BluetoothActivity"
+            android:screenOrientation="portrait" >
+        </activity>
+        <activity
+            android:name="com.driver.DiscoveryActivity"
+            android:screenOrientation="portrait"
+            android:theme="@style/AppTheme.Transparent" >
+        </activity>
+        <activity
+            android:name="com.driver.ClientSocketActivity"
+            android:screenOrientation="portrait"
+            android:theme="@style/AppTheme.Transparent" >
+        </activity>
+        <activity
+            android:name="com.driver.WifiSetupActivity"
+            android:screenOrientation="portrait"
+            android:theme="@style/AppTheme.Transparent" >
+        </activity>
+        
+		<activity
+            android:name="com.driver.NeuralNetSelector"
+            android:screenOrientation="portrait"
+            android:theme="@style/AppTheme.Transparent" >
+        </activity>
+        
+		<activity
+            android:name="com.driver.ReceiveNetActivity"
+            android:screenOrientation="portrait"
+            android:theme="@style/AppTheme.Transparent" >
+        </activity>
+		
+    </application>
+
+</manifest>
